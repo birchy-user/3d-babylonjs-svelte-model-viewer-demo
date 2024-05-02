@@ -19,18 +19,24 @@
 
     let canvas;
 
-    let football;
-    let footballGoal;
+    let waterPoloBall;
+    let waterPoloGoal;
 
     let skybox;
     /** @type {WaterMaterial} */
     let water;
     let ground;
 
+    // Havok fizikas inicializācijas objekts:
     let initializedHavok;
 
     // Ūdens vienmēr atradīsies y = 0 koordinātā:
     const waterLevel = 0;
+
+    // Objektu peldināšanas simulācijas parametri:
+    let isBuoyancyActive = false;  // vai objekts peld ūdenī
+    let buoyancyForce = 10;        // piemērotā peldēšanas spēka apmērs
+    let buoyancyDecayRate = 5;     // Par cik iedaļām samazinās peldēšanas spēka apmērs katrā kadrā
     
     // Definē animāciju, kas izpildās uz noteiktu objektu 5 sekunžu laikā (parametrs 0.2, kas atbilst 1/5 no 1 sekundes) no sākuma punkta (from) uz beigu punktu (to):
     const animateObject = (object, propertyName, from, to, scene) => {
@@ -118,23 +124,22 @@
         // Debesu (skybox) gadījumā ūdens virsma nebūs pietiekami detalizēta; zemes virsmas (ground) gadījumā to nevarēs redzēt zem ūdens
         water.addToRenderList(skybox);
         water.addToRenderList(ground);
-        water.addToRenderList(football);
-        water.addToRenderList(footballGoal);
+        water.addToRenderList(waterPoloBall);
+        water.addToRenderList(waterPoloGoal);
         
         // Assign the water material
         waterMaterial.material = water;
 
-        // Registers a function to be called before every frame render
         // Funkcija, kas tiek izpildīta pirms katra renderētā 3D ainas kadra
         // Pamata ideja ir ar trigonometrisko funkciju palīdzību simulēt, kā laika gaitā objekta vertikālā atrašanās vieta mainās
         // atkarībā no ūdenim piemērotā viļņu ātruma, viļņu augstuma, vēja virziena ()
         // Rezultātā tiek iegūta kustība, kas vizuāli atdarina to, kā fizisks objekts varētu peldēt ūdenī
-        const initialFootballGoalPositionY = footballGoal.position.y;
+        const initialFootballGoalPositionY = waterPoloGoal.position.y;
         scene.registerBeforeRender(() => {
             let time = water._lastTime / 100000;
-            let x = footballGoal.position.x;
-            let z = footballGoal.position.z;
-            footballGoal.position.y = Math.abs(
+            let x = waterPoloGoal.position.x;
+            let z = waterPoloGoal.position.z;
+            waterPoloGoal.position.y = Math.abs(
                 (Math.sin(((x / 0.9) + time * water.waveSpeed * 30)) * water.waveHeight * water.windDirection.x * 0.5) + // water.windDirection.x = vēja virziena x koordināta
                 (Math.cos(((z / 0.05) +  time * water.waveSpeed * 30)) * water.waveHeight * water.windDirection.y * 2.0)  // water.windDirection.y = vēja virziena z koordināta
             );
@@ -142,48 +147,55 @@
 
     };
     
-    // Simulē ūdens fizikālās īpašības - piemēro nelielu spēku norādītajam `mesh` objektam, to pabīdot nedaudz uz augšu:
-    const applyBuoyancyEffect = (mesh) => {
-        const buoyancyForce = 10;
+    // Simulē objekta blīvumu un ar to saistīto peldēšanas kustību ūdenī - piemēro nelielu spēku norādītajam `mesh` objektam, to pabīdot nedaudz uz augšu:
+    const applyBuoyancyEffect = (mesh, force) => {
         const gravity = -9.81;
         mesh.physicsImpostor.applyForce(
-            new BABYLON.Vector3(0, buoyancyForce + gravity * mesh.physicsImpostor.mass, 0),
+            new BABYLON.Vector3(0, force + gravity * mesh.physicsImpostor.mass, 0),
             mesh.getAbsolutePosition()
         );
     };
 
     const initPhysics = async (scene) => {
         // Fizikālās īpašības:
-        const ammoModule = await Ammo.call({});
-        // const plugin = new AmmoJSPlugin(true, ammoModule)
 
+        // Ammo.js (aizvieto Havok)
+        // Trūkumi:
+        //     *) nepieciešama papildus loģika, lai sadursmes starp ground, water un importētiem 3D modeļiem un objektiem tiktu atpazītas un konstatētas
+        //     *) velkot bumbas objektu, tas nedaudz maina pozīciju uz ekrāna (ar Havok tādu problēmu nav)
+        const ammoModule = await Ammo.call({});
+        const plugin = new BABYLON.AmmoJSPlugin(true, ammoModule)
+
+        // Havok fizikas instance
+        // Trūkumi:
+        //     *) nepieciešama papildus loģika, lai varētu vilkt un nomest bumbas objektu, jo pēc noklusējuma tā nestrādā pareizi ar šādiem objektiem)
+        //     *) nepieciešams pēc `npm run dev` palaist `npm run havok-<windows/linux>`, lai apietu problēmu ar tā integrēšanu kopā ar Vite (https://forum.babylonjs.com/t/unable-to-load-havok-plugin-error-while-loading-wasm-file-from-browser/40289/40)
         // const havokInstance = await HavokPhysics();
         // const plugin = new HavokPlugin(true, havokInstance);
 
-        const plugin = new BABYLON.AmmoJSPlugin(true, ammoModule);
-        // scene.enablePhysics(new BABYLON.Vector3(0, 0, 0), plugin);
-        scene.enablePhysics(undefined, plugin);
+        scene.enablePhysics(new BABYLON.Vector3(0, 0, 0), plugin);  // Pēc noklusējuma noņem jebkādu gravitāciju
+        // scene.enablePhysics(undefined, plugin);
 
-        football.physicsImpostor = new BABYLON.PhysicsImpostor(football, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 1, friction: 0.5, restitution: 0.9 }, scene);
+        waterPoloBall.physicsImpostor = new BABYLON.PhysicsImpostor(waterPoloBall, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 1, friction: 0.5, restitution: 0.9 }, scene);
 	    ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0, friction: 0.5, restitution: 0.9 }, scene);
 
-        football.physicsImpostor._physicsBody.linearDamping = 0.3;
-        football.physicsImpostor._physicsBody.angularDamping = 0.3;
+        waterPoloBall.physicsImpostor._physicsBody.linearDamping = 0.3;
+        waterPoloBall.physicsImpostor._physicsBody.angularDamping = 0.3;
 
-        const sphere = BABYLON.MeshBuilder.CreateSphere("sphere1", { segments: 16, diameter: 2 }, scene);
-        
-        sphere.position.y = 8;
-        sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 1, restitution: 0.9 }, scene);
+        // Darbojas ar Havok, nedarbojas ar Ammo.js
+        // waterPoloBall.physicsImpostor.registerOnPhysicsCollide(ground.physicsImpostor, (main, collided) => {
+        //     console.log("waterPoloBall has collided with ground", main, collided);
+        // });
 
-        football.physicsImpostor.registerOnPhysicsCollide(ground.physicsImpostor, (main, collided) => {
-            console.log("Football has collided with ground", main, collided);
-        });
+        // TEST: Bumbas sadursme ar līdzīga tipa (lodes) objektu
+        // const sphere = BABYLON.MeshBuilder.CreateSphere("sphere1", { segments: 16, diameter: 2 }, scene);
+        // sphere.position.y = 8;
+        // sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 1, restitution: 0.9 }, scene);
+        // waterPoloBall.physicsImpostor.registerOnPhysicsCollide(sphere.physicsImpostor, (main, collided) => {
+        //     console.log("waterPoloBall has collided with sphere", main, collided);
+        // });
 
-        football.physicsImpostor.registerOnPhysicsCollide(sphere.physicsImpostor, (main, collided) => {
-            console.log("Football has collided with sphere", main, collided);
-        });
-
-        // Inicializē 'velc-un-nomet' animāciju ("drag and drop"):
+        // Inicializē "velc-un-nomet" animāciju ("drag and drop"):
         const sixDofDragBehavior = new BABYLON.SixDofDragBehavior();
         sixDofDragBehavior.dragDeltaRatio = 0.2; // Jo mazāka vērtība, jo gludāka vilkšanas animācija
         sixDofDragBehavior.zDragFactor = 2; // Nosaka, cik ātri objektam ir jākustas, ja to velk virzienā uz sevi jeb pa z asi (noderīgi, ja objekts, kas tiek vilkts, atrodas tālu no kameras)
@@ -195,16 +207,16 @@
         
         sixDofDragBehavior.onDragObservable.add((event) => {
             console.log("in the middle of drag: ", event);
-            // football.position.x = event.position.x;
-            // football.position.y = event.position.y;
-            // football.position.z = event.position.z;
+            // waterPoloBall.position.x = event.position.x;
+            // waterPoloBall.position.y = event.position.y;
+            // waterPoloBall.position.z = event.position.z;
         });
         sixDofDragBehavior.onDragEndObservable.add((event) => {
             console.log("ending drag: ", event);
             // plugin.setGravity(new BABYLON.Vector3(0,-9.81,0));
         });
         
-        football.addBehavior(sixDofDragBehavior);
+        waterPoloBall.addBehavior(sixDofDragBehavior);
     }
     
     const initScene = async () => {
@@ -233,31 +245,38 @@
 
         // failu atrašanās vietai jābūt `public` mapē, lai Babylon loader to uzreiz pamanītu:
         const assetsManager = new BABYLON.AssetsManager(scene);
-        const meshTask = assetsManager.addMeshTask("football goal task", "", "/assets/models/", "football_goal.glb", ".glb");
+        const meshTask = assetsManager.addMeshTask("water polo goal task", "", "/assets/models/", "water_polo_goal_FINAL.obj", ".obj");
         meshTask.onSuccess = (task) => {
-            footballGoal = task.loadedMeshes[0];
-            footballGoal.scaling = new BABYLON.Vector3(5, 5, 5);
-            footballGoal.position.y = 1;
-            footballGoal.position.z = 20;
-            console.log("football goal loaded: ", footballGoal);
+            // Tā kā OBJ faila ielāde nesaglabā parent-child attiecību, ir manuāli jānorāda galvenā vārtu objekta apakšobjekti, lai saglabātu kopējo karkasu:
+            let goalMesh = task.loadedMeshes[0];
+            task.loadedMeshes.filter(mesh => mesh.name !== 'Goal').forEach(mesh => {
+                if (mesh.name === 'Goal') return;
+
+                goalMesh.addChild(mesh, true);
+            });
+
+            waterPoloGoal = goalMesh;
+            waterPoloGoal.scaling = new BABYLON.Vector3(15, 15, 15);
+            waterPoloGoal.rotate(BABYLON.Axis.Y, -Math.PI / 2, BABYLON.Space.WORLD);
+            waterPoloGoal.position.y = 1;
+            waterPoloGoal.position.z = 80;
         };
         meshTask.onError = (task, message, exception) => {
             console.error(task, message, exception);
         };
         
-        const meshTaskTwo = assetsManager.addMeshTask("football task", "", "/assets/models/", "football.gltf", ".gltf");
+        const meshTaskTwo = assetsManager.addMeshTask("water polo ball task", "", "/assets/models/", "water_polo_ball_FINAL_v2.glb", ".glb");
         meshTaskTwo.onSuccess = (task) => {
-            football = task.loadedMeshes[0];
-            console.log("football loaded: ", football);
-            
-            football.position.x = 4;
-            football.position.y = 15;
+            waterPoloBall = task.loadedMeshes[0];            
+            waterPoloBall.position.x = 4;
+            waterPoloBall.position.y = 7;
         };
         meshTaskTwo.onError = (task, message, exception) => {
             console.error(task, message, exception);
         };
         
         assetsManager.onFinish = async (tasks) => {
+            // Abi modeļi ir ielādēti, varam renderēt visu 3D ainu
             initSkybox(scene);
         
             initGround(scene);
@@ -269,16 +288,34 @@
             await initPhysics(scene);
 
             engine.runRenderLoop(() => {
-                if (football.position.y <= waterLevel && football.position.y >= ground.position.y) {
-                    console.log("Football is in the water");
-                    applyBuoyancyEffect(football);
-                } else if (football.position.y > waterLevel) {
+                const deltaTime = engine.getDeltaTime() / 1000.0;  // sekundes, kas pagājušas starp esošo un iepriekšējo kadru
 
+                const footballPosY = waterPoloBall.getAbsolutePosition().y;
+                const groundPosY = ground.getAbsolutePosition().y;
+
+                if (footballPosY <= waterLevel && footballPosY >= groundPosY) {
+                    // Objekts ir zem ūdens un virs zemes virsmas:
+                    isBuoyancyActive = true;
+                    buoyancyForce = 10;
+                } else if (footballPosY > waterLevel && isBuoyancyActive) {
+                    // Bumba atrodas virs ūdens līmeņa, pakāpeniski lēnām samazinām grimšanas ātrumu
+                    buoyancyForce -= buoyancyDecayRate * deltaTime;
+                    if (buoyancyForce <= 0) {
+                        // Peldēšanas spēks ir apstājies, objektam vairs nav jāpeld zem ūdens, tas tagad jāvirza uz augšu
+                        buoyancyForce = 0;
+                        isBuoyancyActive = false;
+                    }
                 }
+
+                if (isBuoyancyActive) {
+                    applyBuoyancyEffect(waterPoloBall, buoyancyForce);
+                }
+
                 scene.render();
             });
         };
         
+        // Uzsāk importēto modeļu ielādi projektā
         assetsManager.load();
 
         canvas.onresize = function() {
