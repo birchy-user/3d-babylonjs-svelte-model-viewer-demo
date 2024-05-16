@@ -12,7 +12,7 @@
     2. `npm run build` - tiek izveidota optimizēta un izlaidei (_production_) gatava minificēta projekta versija ar minimālajiem nepieciešamajiem failiem mapē `dist`. Lai varētu atvērt šīs vides priekšskatu, ir jāizpilda komanda `npm run preview` - tālāk šo vietni lokāli var atvērt šajā saitē: `http://localhost:4173/`
 
 ## Piekļuve tiešsaistē
-Ja projektu neizdodas palaist uz lokālās ierīces, tad šī projekta jaunāko versiju var apskatīt [šajā saitē](`https://robertspelle-3d-babylonjs-svelte-model-viewer-demo.vercel.app/`), kas tiek uzturēta ar Vercel pakalpojuma palīdzību
+Ja projektu neizdodas palaist uz lokālās ierīces, tad šī projekta jaunāko versiju var apskatīt [šajā saitē](https://robertspelle-3d-babylonjs-svelte-model-viewer-demo.vercel.app/), kas tiek uzturēta ar Vercel pakalpojuma palīdzību
 
 
 ## Palīdzība un jautājumi
