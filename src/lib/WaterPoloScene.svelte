@@ -265,7 +265,7 @@
             console.error(task, message, exception);
         };
         
-        const meshTaskTwo = assetsManager.addMeshTask("water polo ball task", "", "/assets/models/", "water_polo_ball_FINAL_v2.glb", ".glb");
+        const meshTaskTwo = assetsManager.addMeshTask("water polo ball task", "", "/assets/models/", "soccer_ball.glb", ".glb");
         meshTaskTwo.onSuccess = (task) => {
             waterPoloBall = task.loadedMeshes[0];            
             waterPoloBall.position.x = 4;
