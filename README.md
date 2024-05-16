@@ -19,4 +19,6 @@ Ja projektu neizdodas palaist uz lokālās ierīces, tad šī projekta jaunāko 
 Jautājumu gadījumā sazināties ar autoru Robertu Pelli rp18023 (roberts.pelle@gmail.com)
 
 ## Projektā iekļauto modeļu izmantošana
-Visi modeļi, kas atrodas mapē `public/assets/models/`, ir autora oriģināli izveidoti modeļi, kurus var brīvi izmantot bez ierobežojumiem
+Visi ainā izmantotie 3D modeļi atrodas mapē `public/assets/models/`:
+* `soccer_ball.glb` ir brīvi pieejams futbola bumbas 3D modelis, kuru var atrast [šajā saitē](https://sketchfab.com/3d-models/soccer-ball-a51de12e975a425184496fbabc728ca3)
+* `water_polo_goal_FINAL.mbj` un `water_polo_goal_FINAL.obj` ir autora oriģināli veidots ūdenspolo vārtu modelis OBJ formātā programmatūrā _Blender 4.1._
