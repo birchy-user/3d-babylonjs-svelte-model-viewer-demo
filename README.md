@@ -1,4 +1,4 @@
-# Three.js piemērs - 3D objektu, modeļu un ainu izveidošana, importēšana un animēšana, izmantojot Three.js
+# Babylon.js piemērs - 3D objektu, modeļu un ainu izveidošana, importēšana un animēšana, izmantojot Babylon.js
 
 ## Galvenās atkarības
 - NPM (Node Package Manager) versija (pārbaudāma ar `npm -v`) >= 6.14.15
