@@ -52,23 +52,48 @@
         scene.beginDirectAnimation(object, [animation], 0, 100, false, 0.2);
     };
 
-    // Debesis kā kaste, kura iekļauj pārējos modeļus (tās materiāls - saule):
+    /**
+     * Debesis kā kaste, kura iekļauj pārējos modeļus (tās materiāls - saule) - var izmantot variantu 1 vai variantu 2 ar atsevišķiem attēliem
+     * 
+     * @param scene
+     */
     const initSkybox = (scene) => {
-        const skyboxMaterial = new SkyMaterial("skyBox", scene);
-        skyboxMaterial.backFaceCulling = false;
-        // `CubeTexture` ļauj norādīt 6 bildes ar vienādu nosaukumu formātā `NOSAUKUMS_ab`, 
-        // kur a un b var būt viena no šādām vērtībām: px, py, pz (pirmās trīs bildes), nx, ny, nz (nākošās trīs bildes)
-        //  kur a - pirmās 3 bildes (x, y, z asu pozitīvajā virzienā), b - nākošās 3 bildes (x, y, z asu negatīvajā virzienā)
-        // Šajā gadījumā tiks meklētas 6 bildes ar nosaukumu `TropicalSunnyDay_ab`
-        // skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("assets/textures/TropicalSunnyDay", scene);
-        // skyboxMaterial.reflectionTexture.coordinatesMode = BABYLONTexture.SKYBOX_MODE;
-        // skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
-        // skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-        // skyboxMaterial.disableLighting = true;
-        skyboxMaterial.fogEnabled = true;
+        const firstOption = true;  // mainīt uz false, ja grib izmēģināt otru variantu ar kuba tekstūru
+        const skyboxSize = 4000.0;
 
-        skybox = BABYLON.MeshBuilder.CreateBox("skyBox", {size: 4000, width: 4000, height: 4000}, scene);
+        let skyboxMaterial;
+
+        if (firstOption) {
+            // VARIANTS 1 - iebūvētais Skymaterial
+            skyboxMaterial = new SkyMaterial("skyBox", scene);
+            skybox = BABYLON.MeshBuilder.CreateBox("skyBox", {size: skyboxSize, width: skyboxSize, height: skyboxSize}, scene);
+
+        } else {
+            // VARIANTS 2 - kaste ar īpaši definētu kuba tekstūru (no 6 bildēm `TropicalSunnyDay_ab`)
+            /**
+             * `CubeTexture` ļauj norādīt 6 bildes ar vienādu nosaukumu formātā `NOSAUKUMS_ab`, 
+             * kur a un b var būt viena no šādām vērtībām: px, py, pz (pirmās trīs bildes), nx, ny, nz (nākošās trīs bildes)
+             * kur a - pirmās 3 bildes (x, y, z asu pozitīvajā virzienā), b - nākošās 3 bildes (x, y, z asu negatīvajā virzienā)
+             * Šajā gadījumā tiks meklētas 6 bildes ar nosaukumu `TropicalSunnyDay_ab`
+             */
+            skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
+            skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("/assets/textures/TropicalSunnyDay", scene);
+            skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+            skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+            skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+            skyboxMaterial.disableLighting = true;
+            skyboxMaterial.fogEnabled = true;
+            skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: skyboxSize }, scene);
+        }
+
+        skybox.infiniteDistance = true;
+        skyboxMaterial.backFaceCulling = false;
         skybox.material = skyboxMaterial;
+
+        if (firstOption) {
+            // Uzstāda debesis tā, lai tās atbilstu gaišam dienas laikam (kad saule atrodas tieši virs galvas), mainot tās materiāla (šajā gadījumā - saules) slīpumu (inclination)
+            animateObject(skybox, "material.inclination", skybox.material.inclination, 0, scene);
+        }
     };
 
     const initGround = (scene) => {
@@ -96,7 +121,7 @@
         // https://www.babylonjs-playground.com/#L76FB1#120 - sarežģītāks algoritms (ideja, ar kuras palīdzību varētu simulēt objekta iekrišanu ūdenī no gaisa)
 
         // Ūdens virsmas parametri:
-        // Definē pacēluma karti ("bump map"), kas simulē pacēlumus ("bumps") un iespiedumus ("dents") uz renderētas virsmas
+        // Definē pacēluma karti ("bump map"), kas simulē pacēlumus ("bumps") un iespiedumus ("dents") uz renderētās virsmas
         // Tiek paņemts attēls, no kura tiek veidota parastā karte jeb "normal map", kas reprezentē tās struktūru
         // water.bumpTexture = new Texture("assets/textures/waternormals.jpg", scene);
         water.backFaceCulling = true;
@@ -127,24 +152,37 @@
         water.addToRenderList(waterPoloBall);
         water.addToRenderList(waterPoloGoal);
         
-        // Assign the water material
+
         waterMaterial.material = water;
 
-        // Funkcija, kas tiek izpildīta pirms katra renderētā 3D ainas kadra
-        // Pamata ideja ir ar trigonometrisko funkciju palīdzību simulēt, kā laika gaitā objekta vertikālā atrašanās vieta mainās
-        // atkarībā no ūdenim piemērotā viļņu ātruma, viļņu augstuma, vēja virziena ()
-        // Rezultātā tiek iegūta kustība, kas vizuāli atdarina to, kā fizisks objekts varētu peldēt ūdenī
-        const initialFootballGoalPositionY = waterPoloGoal.position.y;
+        /**
+         * Funkcija, kas tiek izpildīta pirms katra renderētā 3D ainas kadra
+         * Pamata ideja ir izmantot modificētu sinusoīda viļņa funkciju - y(t) = A sin(ωt + φ) -, lai simulētu, kā laika gaitā mainās objekta vertikālā atrašanās vieta (y koordināta)
+         * atkarībā no ūdenim piemērotā viļņu ātruma (water.waveSpeed), viļņu augstuma, vēja virziena
+         * Rezultātā tiek iegūta kustība, kas vizuāli atdarina to, kā fizisks objekts varētu peldēt ūdenī
+        */
         scene.registerBeforeRender(() => {
-            let time = water._lastTime / 100000;
-            let x = waterPoloGoal.position.x;
-            let z = waterPoloGoal.position.z;
-            waterPoloGoal.position.y = Math.abs(
-                (Math.sin(((x / 0.9) + time * water.waveSpeed * 30)) * water.waveHeight * water.windDirection.x * 0.5) + // water.windDirection.x = vēja virziena x koordināta
-                (Math.cos(((z / 0.05) +  time * water.waveSpeed * 30)) * water.waveHeight * water.windDirection.y * 2.0)  // water.windDirection.y = vēja virziena z koordināta
-            );
-        });
+            const firstOption = true; // Mainīt uz false, lai izmēģinātu modificēto sinusoīda viļņa funkciju (VARIANTS 2)
+            const timeInMs = water._lastTime / 1000;  // ūdens laika faktors sekundēs
+            const timeMult = timeInMs / 100; // samazina laika faktoru uz 1% no ūdens laika faktora sekundēs
 
+            if (firstOption) {
+                // VARIANTS 1 - sinusoīda viļņu funkcija
+                const A = 0.5;  // šeit - konstanta vidējā amplitūda (pamata formula: A = (max - min) / 2)
+                const T = water.waveSpeed * 2;
+                const omega = 2 * (Math.PI / T);  // leņķiskā frekvence (mainās atkarībā no perioda, kas atbilst viļņu ātrumam)
+                const t = timeInMs;  // 
+                const fi = water.waveHeight;  // viļņa fāze φ (phi) - vārtu peldēšana mainās atkarībā no ūdens virsmas viļņu augstuma
+
+                waterPoloGoal.position.y = A * Math.sin(omega*t + fi);
+            } else {
+                // VARIANTS 2 - modificēta sinusoīda viļņu funkcija
+                waterPoloGoal.position.y = Math.abs(
+                    (Math.sin((timeMult * water.waveSpeed * 30)) * water.waveHeight * water.windDirection.x * 0.5) + // water.windDirection.x = vēja virziena x koordināta
+                    (Math.cos((timeMult * water.waveSpeed * 30)) * water.waveHeight * water.windDirection.y * 2.0)  // water.windDirection.y = vēja virziena z koordināta
+                );
+            }
+        });
     };
     
     // Simulē objekta blīvumu un ar to saistīto peldēšanas kustību ūdenī - piemēro nelielu spēku norādītajam `mesh` objektam, to pabīdot nedaudz uz augšu:
@@ -282,9 +320,7 @@
             initGround(scene);
 
             initBasicWater(scene);
-            // Uzstāda debesis tā, lai tās atbilstu gaišam dienas laikam (kad saule atrodas tieši virs galvas), mainot tās materiāla (šajā gadījumā - saules) slīpumu (inclination)
-            animateObject(skybox, "material.inclination", skybox.material.inclination, 0, scene);
-                        
+
             await initPhysics(scene);
 
             engine.runRenderLoop(() => {
